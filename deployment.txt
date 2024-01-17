@@ -1,0 +1,44 @@
+# Dockerfile for Flask application
+
+FROM python:3.8
+
+WORKDIR /app
+
+COPY requirements.txt /app/requirements.txt
+RUN pip install -r requirements.txt
+
+COPY . /app
+
+EXPOSE 5000
+
+CMD ["python", "app.py"]
+
+Docker Compose Configuration (docker-compose.yml):
+yaml
+
+version: '3'
+
+services:
+  flask-app:
+    build: .
+    ports:
+      - "5000:5000"
+    depends_on:
+      - sql-db
+      - mongo-db
+    environment:
+      - FLASK_RUN_HOST=0.0.0.0
+      - SQLALCHEMY_DATABASE_URI=sqlite:///users.db
+      - MONGO_URI=mongodb://mongo-db:27017/products
+
+  sql-db:
+    image: "sqlite:latest"
+    volumes:
+      - ./data:/data
+
+  mongo-db:
+    image: "mongo:latest"
+    ports:
+      - "27017:27017"
+
+docker-compose up --build
