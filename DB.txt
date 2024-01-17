@@ -1,0 +1,27 @@
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    password VARCHAR(60) NOT NULL
+);
+
+Run MongoDB Container:
+Create a docker-compose-mongo.yml file:
+
+yaml
+Copy code
+version: '3'
+
+services:
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+Run the MongoDB container:
+
+
+
+docker-compose -f docker-compose-mongo.yml up -d
+
+docker exec -it <container_id_or_name> mongo
+use productsDB
+db.createCollection("products")
