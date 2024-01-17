@@ -1,0 +1,141 @@
+pip install Flask Flask-Bcrypt Flask-JWT-Extended Flask-SQLAlchemy Flask-PyMongo
+from flask import Flask, request, jsonify
+from flask_bcrypt import Bcrypt
+from flask_jwt_extended import JWTManager, create_access_token, jwt_required, get_jwt_identity
+from flask_sqlalchemy import SQLAlchemy
+from flask_pymongo import PyMongo
+
+app = Flask(__name__)
+bcrypt = Bcrypt(app)
+jwt = JWTManager(app)
+
+# Replace these with your secret keys in a production environment
+app.config['JWT_SECRET_KEY'] = 'your-secret-key'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///users.db'
+app.config['MONGO_URI'] = 'mongodb://localhost:27017/products'
+
+db = SQLAlchemy(app)
+mongo = PyMongo(app)
+
+class User(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(50), unique=True, nullable=False)
+    password = db.Column(db.String(60), nullable=False)
+
+class Product:
+    def __init__(self, name, price):
+        self.name = name
+        self.price = price
+
+# Sample user (for demonstration purposes)
+users = [
+    {"username": "user1", "password": bcrypt.generate_password_hash("password").decode("utf-8")},
+]
+
+# Sample products (for demonstration purposes)
+products = [
+    {"id": 1, "name": "Product 1", "price": 20.0},
+    {"id": 2, "name": "Product 2", "price": 30.0},
+    # Add more products as needed
+]
+
+@app.route('/register', methods=['POST'])
+def register():
+    data = request.get_json()
+
+    username = data.get('username', None)
+    password = data.get('password', None)
+
+    if not username or not password:
+        return jsonify({"message": "Missing username or password"}), 400
+
+    hashed_password = bcrypt.generate_password_hash(password).decode("utf-8")
+    new_user = User(username=username, password=hashed_password)
+
+    db.session.add(new_user)
+    db.session.commit()
+
+    return jsonify({"message": "User registered successfully"}), 201
+
+@app.route('/login', methods=['POST'])
+def login():
+    data = request.get_json()
+
+    username = data.get('username', None)
+    password = data.get('password', None)
+
+    if not username or not password:
+        return jsonify({"message": "Missing username or password"}), 400
+
+    user = User.query.filter_by(username=username).first()
+
+    if user and bcrypt.check_password_hash(user.password, password):
+        access_token = create_access_token(identity=username)
+        return jsonify(access_token=access_token), 200
+    else:
+        return jsonify({"message": "Invalid username or password"}), 401
+
+@app.route('/products', methods=['GET'])
+@jwt_required()
+def get_products():
+    return jsonify({"products": products})
+
+@app.route('/add_product', methods=['POST'])
+@jwt_required()
+def add_product():
+    data = request.get_json()
+
+    name = data.get('name', None)
+    price = data.get('price', None)
+
+    if not name or not price:
+        return jsonify({"message": "Missing product name or price"}), 400
+
+    new_product = {"name": name, "price": price}
+    products.append(new_product)
+
+    return jsonify({"message": "Product added successfully"}), 201
+
+if __name__ == '__main__':
+    db.create_all()
+    app.run(debug=True)
+
+    # Dockerfile for Flask application
+
+FROM python:3.8
+
+WORKDIR /app
+
+COPY requirements.txt /app/requirements.txt
+RUN pip install -r requirements.txt
+
+COPY . /app
+
+EXPOSE 5000
+
+CMD ["python", "app.py"]
+
+# Docker compose .yml
+
+version: '3'
+
+services:
+  flask-app:
+    build: .
+    ports:
+      - "5000:5000"
+    depends_on:
+      - mongo
+    environment:
+      - FLASK_RUN_HOST=0.0.0.0
+
+  mongo:
+    image: mongo:latest
+    ports:
+      - "27017:27017"
+Now, build and run the Docker containers:
+
+bash
+Copy code
+docker-compose build
+docker-compose up
